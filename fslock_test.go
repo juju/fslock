@@ -48,7 +48,7 @@ func (s *fslockSuite) TestLockNoContention(c *gc.C) {
 	select {
 	case <-started:
 		// good, goroutine started.
-	case <-time.After(shortWait):
+	case <-time.After(shortWait * 2):
 		c.Fatalf("timeout waiting for goroutine to start")
 	}
 
@@ -94,7 +94,7 @@ func (s *fslockSuite) TestLockBlocks(c *gc.C) {
 	select {
 	case <-started:
 		// good, goroutine started.
-	case <-time.After(shortWait):
+	case <-time.After(shortWait * 2):
 		c.Fatalf("timeout waiting for goroutine to start")
 	}
 
@@ -199,7 +199,7 @@ func (s *fslockSuite) TestLockWithTimeout(c *gc.C) {
 	select {
 	case <-started:
 		// good, goroutine started.
-	case <-time.After(shortWait):
+	case <-time.After(shortWait * 2):
 		c.Fatalf("timeout waiting for goroutine to start")
 	}
 
