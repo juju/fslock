@@ -12,45 +12,77 @@ import (
 
 // Lock implements cross-process locks using syscalls.
 // This implementation is based on flock syscall.
-type Lock int
+type Lock struct {
+	filename string
+	fd       int
+}
 
 // New returns a new lock around the given file.
-func New(filename string) (Lock, error) {
-	fd, err := syscall.Open(filename, syscall.O_CREAT|syscall.O_RDONLY, 0600)
-	if err != nil {
-		return 0, err
-	}
-	return Lock(fd), nil
+func New(filename string) *Lock {
+	return &Lock{filename: filename}
 }
 
 // Lock locks the lock.  This call will block until the lock is available.
-func (l Lock) Lock() error {
-	return syscall.Flock(int(l), syscall.LOCK_EX)
+func (l *Lock) Lock() error {
+	if err := l.open(); err != nil {
+		return err
+	}
+	return syscall.Flock(l.fd, syscall.LOCK_EX)
+}
+
+// TryLock attempts to lock the lock.  This method will return ErrLocked
+// immediately if the lock cannot be acquired.
+func (l *Lock) TryLock() error {
+	if err := l.open(); err != nil {
+		return err
+	}
+	err := syscall.Flock(l.fd, syscall.LOCK_EX|syscall.LOCK_NB)
+	if err != nil {
+		syscall.Close(l.fd)
+	}
+	if err == syscall.EWOULDBLOCK {
+		return ErrLocked
+	}
+	return err
+}
+
+func (l *Lock) open() error {
+	fd, err := syscall.Open(l.filename, syscall.O_CREAT|syscall.O_RDONLY, 0600)
+	if err != nil {
+		return err
+	}
+	l.fd = fd
+	return nil
 }
 
 // Unlock unlocks the lock.
-func (l Lock) Unlock() error {
-	return syscall.Flock(int(l), syscall.LOCK_UN)
+func (l *Lock) Unlock() error {
+	return syscall.Close(l.fd)
 }
 
-// LockWithTimeout tries to lock the lock until the timeout expires.
-func (l Lock) LockWithTimeout(timeout time.Duration) error {
-	var t time.Time
-	for {
-		if t.IsZero() {
-			t = time.Now()
-		} else if timeout > 0 && time.Since(t) > timeout {
-			return ErrTimeout
+// LockWithTimeout tries to lock the lock until the timeout expires.  If the
+// timeout expires, this method will return ErrTimeout.
+func (l *Lock) LockWithTimeout(timeout time.Duration) error {
+	if err := l.open(); err != nil {
+		return err
+	}
+	result := make(chan error)
+	cancel := make(chan struct{})
+	go func() {
+		err := syscall.Flock(l.fd, syscall.LOCK_EX)
+		select {
+		case <-cancel:
+			// Timed out, cleanup if necessary.
+			syscall.Flock(l.fd, syscall.LOCK_UN)
+			syscall.Close(l.fd)
+		case result <- err:
 		}
-
-		err := syscall.Flock(int(l), syscall.LOCK_EX|syscall.LOCK_NB)
-		if err == nil {
-			return nil
-		} else if err != syscall.EWOULDBLOCK {
-			return err
-		}
-
-		// Wait for a bit and try again.
-		time.Sleep(50 * time.Millisecond)
+	}()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(timeout):
+		close(cancel)
+		return ErrTimeout
 	}
 }

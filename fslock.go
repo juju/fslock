@@ -17,3 +17,16 @@ func (t timeoutError) Error() string {
 func (timeoutError) Timeout() bool {
 	return true
 }
+
+// ErrLocked indicates TryLock failed because the lock was already locked.
+var ErrLocked error = trylockError("fslock is already locked")
+
+type trylockError string
+
+func (t trylockError) Error() string {
+	return string(t)
+}
+
+func (trylockError) Temporary() bool {
+	return true
+}
