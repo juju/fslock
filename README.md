@@ -5,7 +5,7 @@ fslock provides a cross-process mutex based on file locks that works on windows 
 
 ![fslock](https://cloud.githubusercontent.com/assets/3185864/15507515/f3351498-2199-11e6-9f37-bc59657a9e8c.jpg)
 
-<sup><sub>image: public domain, courtesy [pixabay](https://pixabay.com/en/encrypted-privacy-policy-445155/)
+<sup><sub>image: [public domain](https://pixabay.com/en/encrypted-privacy-policy-445155/)
 (don't ask)
 </sub></sup>
 
